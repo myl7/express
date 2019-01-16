@@ -1,3 +1,6 @@
+#ifndef _DPF
+#define _DPF
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -22,7 +25,7 @@ uint128_t addModP(uint128_t in1, uint128_t in2);
 uint128_t subModP(uint128_t in1, uint128_t in2);
 uint128_t multModP(uint128_t in1, uint128_t in2);
 
-uint128_t getRandomBlock();
+uint128_t getRandomBlock(void);
 
 //DPF functions
 
@@ -44,3 +47,5 @@ void serverVerify(EVP_CIPHER_CTX *ctx, uint128_t seed, int dbLayers, int dbSize,
 
 //auditor functionality
 int auditorVerify(int dbLayers, uint8_t* bits, uint128_t* nonZeroVectors, uint128_t* outVectorsA, uint128_t* outVectorsB);
+
+#endif
