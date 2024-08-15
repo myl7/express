@@ -371,22 +371,20 @@ func leaderWorker(id int, conns <-chan net.Conn, blocker chan<- int, blocker2 <-
 
 			if numCores == 0 { //usual case
 				//run dpf, xor into local db
-				dpfEvalDuration := 0 * time.Second
 				for i := 0; i < dbSize; i++ {
-					dpfSingleEvalStart := time.Now()
 					ds := int(C.db[i].dataSize)
 					dataShare := make([]byte, ds)
 					v := C.evalDPF(C.ctx[id], (*C.uchar)(&input[0]), C.db[i].rowID, C.int(ds), (*C.uchar)(&dataShare[0]))
 					copy(vector[i*16:(i+1)*16], C.GoBytes(unsafe.Pointer(&v), 16))
-					dpfEvalDuration += time.Since(dpfSingleEvalStart)
 					for j := 0; j < ds; j++ {
 						db[i][j] = db[i][j] ^ dataShare[j]
 					}
 				}
-				fmt.Printf("dif eval: %v\n", dpfEvalDuration)
 			} else { //edge case for the latency vs cores experiment
 				//run dpf, xor into local db
 				//spread the eval across goroutines
+				dpfEvalStart := time.Now()
+
 				parablocker := make(chan int)
 				startPoint := 0
 				endPoint := dbSize
@@ -409,27 +407,25 @@ func leaderWorker(id int, conns <-chan net.Conn, blocker chan<- int, blocker2 <-
 				for k := 1; k <= numCores; k++ {
 					<-parablocker
 				}
+
+				fmt.Printf("dpf eval: %v\n", time.Since(dpfEvalStart))
 			}
 
 			//old audit
 			//C.serverVerify(C.ctx[id], (*C.uchar)(&seed[0]), C.layers, C.dbSize, (*C.uchar)(&vector[0]), (*C.uchar)(&outVector[0]));
 			//prepare for audit
-			auditStart0 := time.Now()
+			auditStart := time.Now()
+
 			mVal := make([]byte, 16)
 			cVal := make([]byte, 16)
 			C.serverSetupProof(C.ctx[id], (*C.uchar)(&seed[0]), C.dbSize, (*C.uchar)(&vector[0]), (*C.uchar)(&mVal[0]), (*C.uchar)(&cVal[0]))
-			auditDuration0 := time.Since(auditStart0)
 
 			//log.Println("Waiting for client");
-			blockClientStart := time.Now()
 			<-blockClient
-			blockClientDuration := time.Since(blockClientStart)
+			time.Sleep(30 * time.Millisecond)
 			//compute audit query
-			auditStart1 := time.Now()
 			ansA := make([]byte, 96)
 			C.serverComputeQuery(C.ctx[id], (*C.uchar)(&seed[0]), (*C.uchar)(&mVal[0]), (*C.uchar)(&cVal[0]), (*C.uchar)(&clientAuditInput[0]), (*C.uchar)(&ansA[0]))
-			auditDuration1 := time.Since(auditStart1)
-			fmt.Printf("audit: %v\n", auditDuration0+auditDuration1)
 
 			//log.Println("waiting for server B");
 			blockS2Start := time.Now()
@@ -462,7 +458,9 @@ func leaderWorker(id int, conns <-chan net.Conn, blocker chan<- int, blocker2 <-
 			//compute answer to audit, respond to client if needed
 			auditResp := int(C.serverVerifyProof((*C.uchar)(&ansA[0]), (*C.uchar)(&ansB[4])))
 
-			fmt.Printf("write: %v\n", time.Since(writeStart)-blockClientDuration-blockS2Duration)
+			fmt.Printf("audit: %v\n", time.Since(auditStart))
+
+			fmt.Printf("write: %v\n", time.Since(writeStart)-blockS2Duration)
 
 			if byteToInt(ansB[:4]) == 0 {
 				log.Println("audit failed on server B")
