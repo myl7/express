@@ -422,15 +422,15 @@ func leaderWorker(id int, conns <-chan net.Conn, blocker chan<- int, blocker2 <-
 
 			//log.Println("Waiting for client");
 			<-blockClient
-			time.Sleep(30 * time.Millisecond)
+			// time.Sleep(30 * time.Millisecond)
 			//compute audit query
 			ansA := make([]byte, 96)
 			C.serverComputeQuery(C.ctx[id], (*C.uchar)(&seed[0]), (*C.uchar)(&mVal[0]), (*C.uchar)(&cVal[0]), (*C.uchar)(&clientAuditInput[0]), (*C.uchar)(&ansA[0]))
 
 			//log.Println("waiting for server B");
-			blockS2Start := time.Now()
+			// blockS2Start := time.Now()
 			<-blockS2
-			blockS2Duration := time.Since(blockS2Start)
+			// blockS2Duration := time.Since(blockS2Start)
 
 			//send audit query and response to server B
 			n, err := connB.Write(clientAuditInputB)
@@ -460,7 +460,8 @@ func leaderWorker(id int, conns <-chan net.Conn, blocker chan<- int, blocker2 <-
 
 			fmt.Printf("audit: %v\n", time.Since(auditStart))
 
-			fmt.Printf("write: %v\n", time.Since(writeStart)-blockS2Duration)
+			// fmt.Printf("write: %v\n", time.Since(writeStart)-blockS2Duration)
+			fmt.Printf("write: %v\n", time.Since(writeStart))
 
 			if byteToInt(ansB[:4]) == 0 {
 				log.Println("audit failed on server B")
